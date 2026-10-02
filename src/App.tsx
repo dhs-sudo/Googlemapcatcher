@@ -20,6 +20,8 @@ import { NewOrderModal } from './components/NewOrderModal';
 import { PhotoScannerModal } from './components/PhotoScannerModal';
 import { TripStackAnalyzerModal } from './components/TripStackAnalyzerModal';
 import { ActiveDrivingOverlay } from './components/ActiveDrivingOverlay';
+import { InstallGuideModal } from './components/InstallGuideModal';
+import { isScreenStreamActive, captureCurrentScreenFrame } from './utils/screenStream';
 import { Compass, CheckCircle2, Navigation, Smartphone, Zap, MapPin, Info, Camera, Layers } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -97,6 +99,7 @@ export default function App() {
 
   // UI Modals
   const [showSettings, setShowSettings] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showTripStackModal, setShowTripStackModal] = useState(false);
   const [showDrivingOverlay, setShowDrivingOverlay] = useState(true);
@@ -123,15 +126,60 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // Dedicated trip logger that persists every single trip dispatch for CSV export
+  const logTripToHistory = (
+    address: string,
+    details: {
+      customerName?: string;
+      orderNumber?: string;
+      phone?: string;
+      street?: string;
+      unit?: string;
+      city?: string;
+      state?: string;
+      zipCode?: string;
+      notes?: string;
+      gateCode?: string;
+      source?: string;
+      openedInApp?: boolean;
+    }
+  ) => {
+    const now = new Date();
+    const historyEntry: NavigationHistoryItem = {
+      id: `trip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      address,
+      customerName: details.customerName || 'Customer Destination',
+      orderNumber: details.orderNumber,
+      phone: details.phone,
+      timestamp: now.getTime(),
+      dateTimeStr: now.toISOString(),
+      dateStr: now.toLocaleDateString(),
+      timeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      street: details.street,
+      unit: details.unit,
+      city: details.city,
+      state: details.state,
+      zipCode: details.zipCode,
+      notes: details.notes,
+      gateCode: details.gateCode,
+      travelMode: settings.travelMode,
+      openedInApp: details.openedInApp ?? settings.autoLaunchGoogleMaps,
+      source: details.source || 'direction_press',
+    };
+
+    setHistory((prev) => [historyEntry, ...prev]);
+  };
+
   // The active order object
   const activeOrder = orders.find((o) => o.id === activeOrderId) || orders[0] || null;
 
   // Handle Photo OCR result
   const handlePhotoExtracted = (parsed: ParsedAddress) => {
     // Add to orders queue as newly captured photo ticket
+    const orderNum = `#SCAN-${Math.floor(1000 + Math.random() * 9000)}`;
     const newOrder: CustomerOrder = {
       id: `photo-${Date.now()}`,
-      orderNumber: `#SCAN-${Math.floor(1000 + Math.random() * 9000)}`,
+      orderNumber: orderNum,
       customerName: parsed.customerName || 'Photo Customer',
       address: parsed.street || parsed.formattedAddress,
       unit: parsed.unit,
@@ -152,18 +200,21 @@ export default function App() {
     setActiveOrderId(newOrder.id);
     triggerToast(`Scanned photo for ${newOrder.customerName}!`);
 
-    // Record in History
-    const historyEntry: NavigationHistoryItem = {
-      id: `nav-${Date.now()}`,
-      address: parsed.formattedAddress,
+    // Record in History for CSV log
+    logTripToHistory(parsed.formattedAddress, {
       customerName: parsed.customerName,
+      orderNumber: orderNum,
       phone: parsed.phone,
-      timestamp: Date.now(),
-      travelMode: settings.travelMode,
-      openedInApp: settings.autoLaunchGoogleMaps,
+      street: parsed.street,
+      unit: parsed.unit,
+      city: parsed.city,
+      state: parsed.state,
+      zipCode: parsed.zipCode,
       notes: parsed.notes,
-    };
-    setHistory((prev) => [historyEntry, ...prev]);
+      gateCode: parsed.gateCode,
+      source: 'screen_ocr_scan',
+      openedInApp: settings.autoLaunchGoogleMaps,
+    });
 
     // Handle Launch
     if (settings.autoLaunchGoogleMaps) {
@@ -184,8 +235,32 @@ export default function App() {
 
     let parsedResult: ParsedAddress | null = null;
 
-    // Step 1: If there is an active order in your delivery queue, ALWAYS route to it!
-    if (activeOrder) {
+    // Step 0: If live screen capture stream is active, capture current screen directly (0 manual uploads)
+    if (isScreenStreamActive()) {
+      const frame = captureCurrentScreenFrame();
+      if (frame) {
+        try {
+          const res = await fetch('/api/scan-photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: frame,
+              mimeType: 'image/jpeg',
+            }),
+          });
+          const data = await res.json();
+          if (data.stops && Array.isArray(data.stops) && data.stops.length > 0) {
+            parsedResult = data.stops[0];
+            triggerToast(`Snapped screen destination: ${data.stops[0].formattedAddress}`);
+          }
+        } catch (err) {
+          console.warn('Live screen snap error:', err);
+        }
+      }
+    }
+
+    // Step 1: If there is an active order in your delivery queue, route to it!
+    if (!parsedResult && activeOrder) {
       parsedResult = {
         raw: activeOrder.rawText,
         customerName: activeOrder.customerName,
@@ -239,18 +314,21 @@ export default function App() {
       speakAddress(`Navigating to ${parsedResult.formattedAddress}`);
     }
 
-    // Record in History
-    const historyEntry: NavigationHistoryItem = {
-      id: `nav-${Date.now()}`,
-      address: parsedResult.formattedAddress,
+    // Record in History for CSV log
+    logTripToHistory(parsedResult.formattedAddress, {
       customerName: parsedResult.customerName,
+      orderNumber: activeOrder?.orderNumber,
       phone: parsedResult.phone,
-      timestamp: Date.now(),
-      travelMode: settings.travelMode,
-      openedInApp: settings.autoLaunchGoogleMaps,
+      street: parsedResult.street,
+      unit: parsedResult.unit,
+      city: parsedResult.city,
+      state: parsedResult.state,
+      zipCode: parsedResult.zipCode,
       notes: parsedResult.notes,
-    };
-    setHistory((prev) => [historyEntry, ...prev]);
+      gateCode: parsedResult.gateCode,
+      source: parsedResult.source || 'floating_go_button',
+      openedInApp: settings.autoLaunchGoogleMaps,
+    });
 
     // Handle Launch: Instant vs Preview Sheet
     if (settings.autoLaunchGoogleMaps) {
@@ -276,17 +354,19 @@ export default function App() {
     if (settings.soundEnabled) sound.playLockSuccess();
     if (settings.voiceAnnouncement) speakAddress(`Routing to ${parsed.formattedAddress}`);
 
-    const historyEntry: NavigationHistoryItem = {
-      id: `nav-${Date.now()}`,
-      address: parsed.formattedAddress,
+    logTripToHistory(parsed.formattedAddress, {
       customerName: parsed.customerName,
       phone: parsed.phone,
-      timestamp: Date.now(),
-      travelMode: settings.travelMode,
-      openedInApp: false,
+      street: parsed.street,
+      unit: parsed.unit,
+      city: parsed.city,
+      state: parsed.state,
+      zipCode: parsed.zipCode,
       notes: parsed.notes,
-    };
-    setHistory((prev) => [historyEntry, ...prev]);
+      gateCode: parsed.gateCode,
+      source: parsed.source || 'manual_speech_capture',
+      openedInApp: false,
+    });
     setCapturedAddress(parsed);
   };
 
@@ -312,17 +392,20 @@ export default function App() {
     if (settings.soundEnabled) sound.playLockSuccess();
     if (settings.voiceAnnouncement) speakAddress(`Routing to ${order.customerName}`);
 
-    const historyEntry: NavigationHistoryItem = {
-      id: `nav-${Date.now()}`,
-      address: parsed.formattedAddress,
-      customerName: parsed.customerName,
-      phone: parsed.phone,
-      timestamp: Date.now(),
-      travelMode: settings.travelMode,
+    logTripToHistory(parsed.formattedAddress, {
+      customerName: order.customerName,
+      orderNumber: order.orderNumber,
+      phone: order.phone,
+      street: order.address,
+      unit: order.unit,
+      city: order.city,
+      state: order.state,
+      zipCode: order.zipCode,
+      notes: order.deliveryNotes,
+      gateCode: order.gateCode,
+      source: 'order_card_direct',
       openedInApp: settings.autoLaunchGoogleMaps,
-      notes: parsed.notes,
-    };
-    setHistory((prev) => [historyEntry, ...prev]);
+    });
 
     if (settings.autoLaunchGoogleMaps) {
       openInPhoneMaps(parsed.formattedAddress, settings.travelMode, true);
@@ -372,6 +455,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenSettings={() => setShowSettings(true)}
         onOpenNewOrder={() => setShowNewOrder(true)}
+        onOpenInstall={() => setShowInstallGuide(true)}
         pendingCount={orders.filter((o) => o.status !== 'delivered').length}
       />
 
@@ -568,6 +652,7 @@ export default function App() {
           }
           onClose={() => setShowSettings(false)}
           onResetButtonPosition={handleResetButtonPosition}
+          onOpenInstall={() => setShowInstallGuide(true)}
         />
       )}
 
@@ -577,6 +662,11 @@ export default function App() {
           onClose={() => setShowNewOrder(false)}
           onAddOrder={handleAddOrder}
         />
+      )}
+
+      {/* Install App on Phone Guide Modal */}
+      {showInstallGuide && (
+        <InstallGuideModal onClose={() => setShowInstallGuide(false)} />
       )}
 
       {/* Floating Toast Notification */}

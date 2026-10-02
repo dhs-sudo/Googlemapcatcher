@@ -1,11 +1,12 @@
 import React from 'react';
-import { Navigation, Settings, Plus, Smartphone, History, ListOrdered, Camera, ShieldCheck } from 'lucide-react';
+import { Navigation, Settings, Plus, Smartphone, History, ListOrdered, Camera, ShieldCheck, Download } from 'lucide-react';
 
 interface TopBarProps {
   activeTab: 'orders' | 'history' | 'capture' | 'photo';
   setActiveTab: (tab: 'orders' | 'history' | 'capture' | 'photo') => void;
   onOpenSettings: () => void;
   onOpenNewOrder: () => void;
+  onOpenInstall?: () => void;
   pendingCount: number;
 }
 
@@ -14,6 +15,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   setActiveTab,
   onOpenSettings,
   onOpenNewOrder,
+  onOpenInstall,
   pendingCount,
 }) => {
   return (
@@ -89,6 +91,17 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Zone 3: Primary Actions */}
         <div className="flex items-center gap-2">
+          {onOpenInstall && (
+            <button
+              onClick={onOpenInstall}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all whitespace-nowrap cursor-pointer hover:border-emerald-500/50"
+              title="Install app on your phone"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Install App</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenSettings}
             className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-500/30 rounded-lg transition-colors whitespace-nowrap"

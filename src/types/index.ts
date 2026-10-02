@@ -40,11 +40,22 @@ export interface NavigationHistoryItem {
   id: string;
   address: string;
   customerName?: string;
+  orderNumber?: string;
   phone?: string;
   timestamp: number;
+  dateTimeStr?: string;
+  dateStr?: string;
+  timeStr?: string;
+  street?: string;
+  unit?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   travelMode: 'driving' | 'bicycling' | 'walking' | 'transit';
   openedInApp: boolean;
   notes?: string;
+  gateCode?: string;
+  source?: string;
 }
 
 export interface AppSettings {

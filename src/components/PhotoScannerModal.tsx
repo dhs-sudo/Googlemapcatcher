@@ -15,6 +15,13 @@ import {
 } from 'lucide-react';
 import { ParsedAddress, CustomerOrder } from '../types';
 import { triggerHaptic, sound } from '../utils/audio';
+import {
+  isScreenCaptureSupported,
+  isScreenStreamActive,
+  initScreenStream,
+  captureCurrentScreenFrame,
+  stopScreenStream,
+} from '../utils/screenStream';
 
 export interface ExtractedStop extends ParsedAddress {
   stopNumber?: number;
@@ -39,8 +46,37 @@ export const PhotoScannerModal: React.FC<PhotoScannerProps> = ({
   const [activeStopIndex, setActiveStopIndex] = useState<number>(0);
   const [pickupInfo, setPickupInfo] = useState<{ name?: string; address?: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [screenLive, setScreenLive] = useState<boolean>(() => isScreenStreamActive());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const handleConnectScreen = async () => {
+    const success = await initScreenStream();
+    if (success) {
+      setScreenLive(true);
+      triggerHaptic(40);
+      const frame = captureCurrentScreenFrame();
+      if (frame) {
+        setSelectedImage(frame);
+        scanWithGemini(frame, 'image/jpeg');
+      }
+    }
+  };
+
+  const handleSnapLiveScreen = () => {
+    const frame = captureCurrentScreenFrame();
+    if (frame) {
+      setSelectedImage(frame);
+      scanWithGemini(frame, 'image/jpeg');
+    } else {
+      handleConnectScreen();
+    }
+  };
+
+  const handleStopScreen = () => {
+    stopScreenStream();
+    setScreenLive(false);
+  };
 
   // Handle image file selection
   const processImageFile = (file: File) => {
@@ -254,6 +290,58 @@ export const PhotoScannerModal: React.FC<PhotoScannerProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* 0-UPLOAD OPTION: Direct Live Screen Snapper */}
+      {isScreenCaptureSupported() && (
+        <div className="bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/50 border border-purple-500/40 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                  Auto Screen Capture (Zero Manual Uploads)
+                  {screenLive && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold">
+                      LIVE
+                    </span>
+                  )}
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  {screenLive
+                    ? 'Screen stream connected! Tap below to snap and analyze instantly with 0 uploads.'
+                    : 'Connect screen capture once. Then every button tap snaps and analyzes your screen automatically.'}
+                </p>
+              </div>
+            </div>
+
+            {screenLive && (
+              <button
+                onClick={handleStopScreen}
+                className="text-[11px] text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/50 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={screenLive ? handleSnapLiveScreen : handleConnectScreen}
+            className="w-full py-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/20 transition-all cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
+            <span>{screenLive ? '📸 Snap Current Screen Now (0 Uploads)' : '⚡ Connect Auto Screen Capture (No Uploading Needed)'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Manual Upload or Snap Fallbacks */}
+      <div className="space-y-1">
+        <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
+          Optional Fallbacks:
+        </span>
       </div>
 
       {/* Primary Action Buttons: Upload or Snap */}

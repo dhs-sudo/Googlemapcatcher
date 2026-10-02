@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <!-- Radar Outer Rings -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#10b981" stroke-width="4" opacity="0.25" stroke-dasharray="8 8" />
+  <circle cx="256" cy="256" r="130" fill="none" stroke="#34d399" stroke-width="4" opacity="0.4" />
+
+  <!-- Navigation Compass Icon (Safe Zone Centered) -->
+  <g transform="translate(256, 256) rotate(-45) translate(-140, -140)" filter="url(#glow)">
+    <polygon points="140,20 250,260 140,200 30,260" fill="url(#navGrad)" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" />
+    <!-- Center Pulse -->
+    <circle cx="140" cy="180" r="10" fill="#ffffff" />
+  </g>
+</svg>

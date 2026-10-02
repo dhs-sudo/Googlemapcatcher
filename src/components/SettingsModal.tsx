@@ -29,6 +29,7 @@ interface SettingsModalProps {
   onClose: () => void;
   onResetButtonPosition: () => void;
   onSetPresetPosition?: (dock: 'bottom-right' | 'bottom-left' | 'top-right') => void;
+  onOpenInstall?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -37,6 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onResetButtonPosition,
   onSetPresetPosition,
+  onOpenInstall,
 }) => {
   return (
     <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -273,6 +275,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </li>
           </ul>
         </div>
+
+        {/* SECTION 5: Install App on Phone */}
+        {onOpenInstall && (
+          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+            <div>
+              <span className="font-bold text-white text-xs block">Install on Your Phone</span>
+              <p className="text-[11px] text-slate-400">Run fullscreen on iOS Safari or Android Chrome</p>
+            </div>
+            <button
+              onClick={() => {
+                onClose();
+                onOpenInstall();
+              }}
+              className="py-1.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer shrink-0"
+            >
+              Install Guide
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="pt-2 flex items-center justify-between border-t border-slate-800">
