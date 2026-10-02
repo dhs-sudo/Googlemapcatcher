@@ -71,4 +71,5 @@ export interface AppSettings {
   buttonOpacity?: number; // 0.4 to 1.0 (translucent ghost mode)
   autoSnapToEdge?: boolean;
   showAnalyzeButton?: boolean;
+  themeMode?: 'dark' | 'light' | 'auto'; // 'dark' (night driving anti-glare), 'light' (daytime high contrast), 'auto' (ambient sync)
 }
